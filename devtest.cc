@@ -29,7 +29,6 @@
 #include <cassert>
 #include <vector>
 #include <stdlib.h>
-#include <sys/eventfd.h>
 #include <thread>
 #include <stdio.h>
 

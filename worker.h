@@ -21,41 +21,71 @@
 #ifndef WORKER_H
 #define WORKER_H 1
 
-#include <queue>
-#include <mutex>
-#include <condition_variable>
+#include <thread>
+#include <vector>
+#include "pipe.h"
 
-template<class T>
+template<class READ, class WRITE>
 class Worker {
 public:
-    Worker(MultiQueue<T> & in, MultiQueue<T> & out)
-	: in_(in), out_(out), thread_(&Worker::run, this) { }
+    using Read = READ;
+    using Write = WRITE;
+    Worker(ReadPipe<Read> in, WritePipe<Write> out)
+	: in_(std::move(in)), out_(std::move(out)),
+	  thread_(&Worker::run, this) { }
 
-    ~Worker() {
-	if (thread_.joinable())
-	    thread_.join();
+    virtual ~Worker(void) {
+	thread_.join();
     }
-    
+
+    std::thread::id get_id(void) const {
+	return thread_.get_id();
+    }
+
+    virtual Write * work(Read * input) = 0;
 private:
     Worker(Worker &&) = delete;
     Worker & operator =(Worker &&) = delete;
 
     void run(void) {
 	while (true) {
-	    T * job = in_.pop();
-	    if (job == &T::QUIT) {
-		// put it back for other workers and quit
-		in_.push(std::move(job));
-		break;
-	    }
-	    (*job)();
-	    out_.push(job);
+	    Read * input = in_.read();
+	    if (!in_) break;
+	    Write * output = work(input);
+	    out_.write(output);
+	}
+	out_.close();
+    }
+
+    ReadPipe<Read> in_;
+    WritePipe<Write> out_;
+    std::thread thread_;
+};
+
+template<class W>
+class Workers {
+public:
+    using Read = typename W::Read;
+    using Write = typename W::Write;
+
+    Workers(int num, ReadPipe<Read> in, WritePipe<Write> out) {
+	while (num-- > 0) {
+	    worker_.emplace_back(new W(std::move(in.dup()),
+				       std::move(out.dup())));
 	}
     }
 
-    MultiQueue<T> & in_;
-    MultiQueue<T> & out_;
-    std::thread thread_;
+    ~Workers() {
+	for (typename std::vector<W *>::iterator it = worker_.begin();
+	     it != worker_.end(); ++it) {
+	    delete *it;
+	}
+    }
+private:
+    Workers(Workers &&) = delete;
+    Workers & operator =(Workers &&) = delete;
+
+    std::vector<W *> worker_;
 };
 
 #endif // #ifndef WORKER_H

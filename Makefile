@@ -3,7 +3,7 @@ LDFLAGS := $(CXXFLAGS) -laio -lpthread
 
 all: devtest
 
-devtest: devtest.o
+devtest: fd.o eventfd.o file.o iocb.o context.o iothread.o main.o
 	$(CXX) $(LDFLAGS) -o $@ $+
 
 %.o: %.cc
