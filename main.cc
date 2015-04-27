@@ -283,7 +283,7 @@ int main(int argc, char * const argv []) {
 	last = start;
 	// fill pipe with buffers
 	for (int i = 0; i < num_iocb; ++i) {
-	    IOCB * iocb = new IOCB(file, IOCB::WRITE, blocksize);
+	    IOCB * iocb = new IOCB(file, IOCB::READ, blocksize);
 	    iocb->offset(offset);
 	    offset += blocksize;
 	    iocb->fill();
